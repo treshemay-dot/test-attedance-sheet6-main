@@ -167,6 +167,10 @@ th { background: var(--soft); color: #475569; font-size: 12px; text-transform: u
 
 .empty { padding: 16px; color: var(--muted); }
 
+.iso { font-family: monospace; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.iso button.copy-iso { margin-left: 8px; font-size: 11px; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--border); background: white; cursor: pointer; }
+.iso button.copy-iso:hover { background: var(--soft); }
+
 .message {
   min-height: 24px;
   margin-top: 18px;

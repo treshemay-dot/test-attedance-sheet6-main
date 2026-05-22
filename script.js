@@ -250,8 +250,14 @@ function renderAttendance(records) {
       <td>${escapeHtml(record.name)}</td>
       <td>${escapeHtml(record.email)}</td>
       <td>${escapeHtml(record.campaign || '')}</td>
-      <td>${escapeHtml(record.checkIn || '')}</td>
-      <td>${escapeHtml(record.checkOut || '')}</td>
+      <td>
+        ${escapeHtml(record.checkIn || '')}${record.checkInTz ? ' (' + escapeHtml(record.checkInTz) + ')' : ''}
+        ${record.checkInIso ? '<div class="iso">ISO: ' + escapeHtml(record.checkInIso) + ' <button class="copy-iso" data-iso="' + escapeHtml(record.checkInIso) + '">Copy</button></div>' : ''}
+      </td>
+      <td>
+        ${escapeHtml(record.checkOut || '')}${record.checkOutTz ? ' (' + escapeHtml(record.checkOutTz) + ')' : ''}
+        ${record.checkOutIso ? '<div class="iso">ISO: ' + escapeHtml(record.checkOutIso) + ' <button class="copy-iso" data-iso="' + escapeHtml(record.checkOutIso) + '">Copy</button></div>' : ''}
+      </td>
       <td>${escapeHtml(record.totalHours || '')}</td>
       <td><span class="mini-status ${String(record.status).toLowerCase()}">${escapeHtml(record.status || '')}</span></td>
     </tr>
@@ -304,6 +310,16 @@ function init() {
 
   $('adminLoginBtn').addEventListener('click', loginAdmin);
   $('refreshAdminBtn').addEventListener('click', loadAdminData);
+  $('migrateHeadersBtn').addEventListener('click', async () => {
+    try {
+      showMessage('Migrating attendance headers...', 'info');
+      const result = await api('migrateAttendance', adminPayload());
+      showMessage(result.message, 'success');
+      await loadAdminData();
+    } catch (err) {
+      showMessage(err.message, 'error');
+    }
+  });
   $('adminLogoutBtn').addEventListener('click', adminLogout);
 
   $('agentsTableWrap').addEventListener('click', (event) => {
@@ -319,3 +335,12 @@ function init() {
 }
 
 init();
+
+// Copy ISO timestamp handler (delegated)
+document.getElementById('attendanceTableWrap')?.addEventListener('click', (event) => {
+  const btn = event.target.closest && event.target.closest('button.copy-iso');
+  if (!btn) return;
+  const iso = btn.dataset.iso || '';
+  if (!iso) return showMessage('No ISO value to copy.', 'error');
+  navigator.clipboard?.writeText(iso).then(() => showMessage('ISO copied to clipboard.', 'success')).catch(() => showMessage('Copy failed.', 'error'));
+});

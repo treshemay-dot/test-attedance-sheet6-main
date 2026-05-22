@@ -14,7 +14,7 @@ const SPREADSHEET_ID = '1dRVpTsaJK-SOzxDAWlB3ZxZlgalCJk9kBdxOwvqWrs8';
 const COMPANY_NAME = 'Opti-work Solutions';
 const ADMIN_EMAILS = ['workfreelance772@gmail.com'];
 const ADMIN_PIN = '101786141220';
-const TIMEZONE = 'America/Chicago';
+const TIMEZONE = 'America/New_York';
 
 const AGENTS_SHEET = 'AGENTS';
 const ATTENDANCE_SHEET = 'ATTENDANCE';
@@ -27,7 +27,8 @@ const AGENT_HEADERS = [
 
 const ATTENDANCE_HEADERS = [
   'Record ID', 'Agent ID', 'Name', 'Email', 'Campaign', 'Check In',
-  'Check Out', 'Total Hours', 'Status', 'Created At'
+  'Check In ISO', 'Check In TZ', 'Check Out', 'Check Out ISO', 'Check Out TZ',
+  'Total Hours', 'Status', 'Created At'
 ];
 
 const HISTORY_HEADERS = [
@@ -49,6 +50,7 @@ function doPost(e) {
       case 'loginAgent': return loginAgent(ss, data);
       case 'checkIn': return checkIn(ss, data);
       case 'checkOut': return checkOut(ss, data);
+      case 'migrateAttendance': return migrateAttendance(ss, data);
       case 'adminLogin': return adminLogin(data);
       case 'getAdminData': return getAdminData(ss, data);
       case 'approveAgent': return updateAgentStatus(ss, data, 'Approved');
@@ -61,6 +63,29 @@ function doPost(e) {
     Logger.log(err.stack || err.toString());
     return jsonResponse(false, 'Server error: ' + err.message);
   }
+}
+
+function migrateAttendance(ss, data) {
+  const adminCheck = verifyAdmin(data);
+  if (adminCheck !== true) return adminCheck;
+
+  let sheet = ss.getSheetByName(ATTENDANCE_SHEET);
+  if (!sheet) sheet = ss.insertSheet(ATTENDANCE_SHEET);
+
+  const headerRange = sheet.getRange(1, 1, 1, ATTENDANCE_HEADERS.length);
+  const current = headerRange.getValues()[0];
+  let changed = false;
+  for (let i = 0; i < ATTENDANCE_HEADERS.length; i++) {
+    if (String(current[i] || '').trim() !== ATTENDANCE_HEADERS[i]) {
+      current[i] = ATTENDANCE_HEADERS[i];
+      changed = true;
+    }
+  }
+  headerRange.setValues([current]);
+  sheet.setFrozenRows(1);
+
+  logHistory(ss, 'MIGRATE_ATTENDANCE', normalizeEmail(data.adminEmail || ''), `Attendance headers synchronized.`);
+  return jsonResponse(true, changed ? 'Attendance headers updated.' : 'Attendance headers already up to date.');
 }
 
 function parseRequest(e) {
@@ -170,21 +195,22 @@ function checkIn(ss, data) {
   if (openRecord) {
     return jsonResponse(false, 'You are already checked in. Please check out first.');
   }
-
   let now = data.timestamp ? new Date(data.timestamp) : new Date();
   if (isNaN(now.getTime())) now = new Date();
   const recordId = 'REC-' + Utilities.getUuid().slice(0, 8).toUpperCase();
   const checkInDisplay = formatDateTime(now, data.timeZone);
 
+  // Append with new ISO columns: Check In ISO at col7, Check Out at col8, Check Out ISO at col9
   attendanceSheet.appendRow([
     recordId, agent.agentId, agent.name, agent.email, agent.campaign,
-    now, '', '', 'Open', now
+    now, data.timestamp || '', data.timeZone || '', '', '', '', '', 'Open', now
   ]);
 
   // Keep the sheet readable while still storing real Date values for correct duration math.
   const lastRow = attendanceSheet.getLastRow();
   attendanceSheet.getRange(lastRow, 6).setNumberFormat('yyyy-mm-dd hh:mm:ss AM/PM');
-  attendanceSheet.getRange(lastRow, 10).setNumberFormat('yyyy-mm-dd hh:mm:ss AM/PM');
+  attendanceSheet.getRange(lastRow, 9).setNumberFormat('yyyy-mm-dd hh:mm:ss AM/PM');
+  attendanceSheet.getRange(lastRow, 14).setNumberFormat('yyyy-mm-dd hh:mm:ss AM/PM');
 
   logHistory(ss, 'CHECK_IN', email, `${agent.name} checked in at ${checkInDisplay}.`);
   return jsonResponse(true, `Checked in at ${checkInDisplay}.`);
@@ -199,16 +225,19 @@ function checkOut(ss, data) {
   if (!openRecord) {
     return jsonResponse(false, 'No open check-in found. Please check in first.');
   }
-
   let now = data.timestamp ? new Date(data.timestamp) : new Date();
   if (isNaN(now.getTime())) now = new Date();
   const checkOutDisplay = formatDateTime(now, data.timeZone);
-  const checkInDate = parseDate(openRecord.values[5]);
-  const totalHours = calculateHours(checkInDate, now);
 
-  attendanceSheet.getRange(openRecord.rowNumber, 7).setValue(now).setNumberFormat('yyyy-mm-dd hh:mm:ss AM/PM');
-  attendanceSheet.getRange(openRecord.rowNumber, 8).setValue(totalHours);
-  attendanceSheet.getRange(openRecord.rowNumber, 9).setValue('Completed');
+  // Prefer the original client ISO if present for accurate instant comparison
+  const checkInInstant = openRecord.values[6] ? parseDate(openRecord.values[6]) : parseDate(openRecord.values[5]);
+  const totalHours = calculateHours(checkInInstant, now);
+
+  attendanceSheet.getRange(openRecord.rowNumber, 9).setValue(now).setNumberFormat('yyyy-mm-dd hh:mm:ss AM/PM');
+  attendanceSheet.getRange(openRecord.rowNumber, 10).setValue(data.timestamp || '');
+  attendanceSheet.getRange(openRecord.rowNumber, 11).setValue(data.timeZone || '');
+  attendanceSheet.getRange(openRecord.rowNumber, 12).setValue(totalHours);
+  attendanceSheet.getRange(openRecord.rowNumber, 13).setValue('Completed');
 
   logHistory(ss, 'CHECK_OUT', email, `${agent.name} checked out at ${checkOutDisplay}. Total: ${totalHours}.`);
   return jsonResponse(true, `Checked out at ${checkOutDisplay}. Total: ${totalHours}.`);
@@ -242,7 +271,11 @@ function getAdminData(ss, data) {
     email: r.email,
     campaign: r.campaign,
     checkIn: r.checkIn,
+    checkInIso: r.checkInIso,
+    checkInTz: r.checkInTz,
     checkOut: r.checkOut,
+    checkOutIso: r.checkOutIso,
+    checkOutTz: r.checkOutTz,
     totalHours: r.totalHours,
     status: r.status
   }));
@@ -308,7 +341,8 @@ function getOpenAttendanceForEmail(sheet, email) {
   const rows = sheet.getDataRange().getValues();
   for (let i = rows.length - 1; i >= 1; i--) {
     const rowEmail = normalizeEmail(rows[i][3]);
-    const status = clean(rows[i][8]);
+    // Status moved to column 13 after adding ISO and TZ columns
+    const status = clean(rows[i][12]);
     if (rowEmail === email && status === 'Open') {
       return { rowNumber: i + 1, values: rows[i] };
     }
@@ -351,10 +385,14 @@ function rowToAttendance(row) {
     email: normalizeEmail(row[3]),
     campaign: clean(row[4]),
     checkIn: formatAny(row[5]),
-    checkOut: formatAny(row[6]),
-    totalHours: clean(row[7]),
-    status: clean(row[8]),
-    createdAt: formatAny(row[9])
+    checkInIso: clean(row[6]),
+    checkInTz: clean(row[7]),
+    checkOut: formatAny(row[8]),
+    checkOutIso: clean(row[9]),
+    checkOutTz: clean(row[10]),
+    totalHours: clean(row[11]),
+    status: clean(row[12]),
+    createdAt: formatAny(row[13])
   };
 }
 
