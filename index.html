@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Opti-work Solutions remote attendance check-in/check-out system" />
+  <meta name="theme-color" content="#1f2937" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css?v=20260522-totalhours-fix2" />
+  <title>Opti-work Solutions Attendance</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <img class="brand-logo" src="logo.png" alt="Opti-work Solutions logo" />
+      <div>
+        <p class="eyebrow">Remote Attendance System</p>
+        <h1>Opti-work Solutions</h1>
+        <p class="subtext">Check in, check out, and admin approval in one simple web app.</p>
+      </div>
+    </header>
+
+    <main class="card">
+      <nav class="tabs" aria-label="Main navigation">
+        <button class="tab active" data-screen="loginScreen">Agent Login</button>
+        <button class="tab" data-screen="registerScreen">Register</button>
+        <button class="tab" data-screen="adminScreen">Admin</button>
+      </nav>
+
+      <section id="loginScreen" class="screen active">
+        <h2>Agent Login</h2>
+        <p class="helper">Approved agents can log in and record attendance.</p>
+        <label>Email</label>
+        <input id="loginEmail" type="email" placeholder="agent@email.com" autocomplete="email" />
+        <label>PIN</label>
+        <input id="loginPin" type="password" inputmode="numeric" placeholder="Your PIN" autocomplete="current-password" />
+        <button id="agentLoginBtn" class="btn primary">Login</button>
+      </section>
+
+      <section id="registerScreen" class="screen">
+        <h2>Agent Registration</h2>
+        <p class="helper">After registering, wait for admin approval before you can check in.</p>
+        <label>Full Name</label>
+        <input id="regName" type="text" placeholder="Full name" />
+        <label>Email</label>
+        <input id="regEmail" type="email" placeholder="agent@email.com" autocomplete="email" />
+        <label>Campaign</label>
+        <input id="regCampaign" type="text" placeholder="Example: Energy Campaign" />
+        <label>Create PIN</label>
+        <input id="regPin" type="password" inputmode="numeric" placeholder="Example: 1234" autocomplete="new-password" />
+        <button id="registerBtn" class="btn primary">Create Account</button>
+      </section>
+
+      <section id="agentDashboard" class="screen">
+        <div class="dashboard-head">
+          <div>
+            <p class="eyebrow">Agent Dashboard</p>
+            <h2 id="agentWelcome">Welcome</h2>
+            <p id="agentMeta" class="helper"></p>
+          </div>
+          <button id="agentLogoutBtn" class="btn ghost">Logout</button>
+        </div>
+
+        <div class="status-box">
+          <span id="agentStatusBadge" class="badge">Not checked in</span>
+          <p id="lastActionText">No attendance action yet.</p>
+        </div>
+
+        <div class="action-grid">
+          <button id="checkInBtn" class="btn success">Check In</button>
+          <button id="checkOutBtn" class="btn danger">Check Out</button>
+        </div>
+      </section>
+
+      <section id="adminScreen" class="screen">
+        <h2>Admin Login</h2>
+        <p class="helper">Enter the admin PIN to open the dashboard.</p>
+        <input id="adminEmail" type="hidden" value="workfreelance772@gmail.com" />
+        <label>Admin PIN</label>
+        <input id="adminPin" type="password" inputmode="numeric" placeholder="Admin PIN" autocomplete="current-password" />
+        <button id="adminLoginBtn" class="btn primary">Open Admin Dashboard</button>
+      </section>
+
+      <section id="adminDashboard" class="screen">
+        <div class="dashboard-head">
+          <div>
+            <p class="eyebrow">Admin Dashboard</p>
+            <h2>Agents & Attendance</h2>
+            <p class="helper">Approve registrations, disable fired agents, and review check-in/out logs.</p>
+          </div>
+          <div class="admin-actions">
+            <button id="refreshAdminBtn" class="btn ghost">Refresh</button>
+            <button id="adminLogoutBtn" class="btn ghost">Logout</button>
+          </div>
+        </div>
+
+        <h3>Agent Accounts</h3>
+        <div id="agentsTableWrap" class="table-wrap"></div>
+
+        <h3>Recent Attendance</h3>
+        <div id="attendanceTableWrap" class="table-wrap"></div>
+      </section>
+
+      <div id="message" class="message" role="status"></div>
+    </main>
+
+    <footer>
+      <p>Default timezone: US Central Time / America/Chicago</p>
+    </footer>
+  </div>
+
+  <script src="script.js?v=20260522-totalhours-fix2"></script>
+</body>
+</html>
